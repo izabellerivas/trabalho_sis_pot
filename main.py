@@ -64,8 +64,8 @@ else:
     e = 0.01
     n = 4 
     slack = 1 
-    PV = None
-    PQ = [2,3,4]
+    PV = [3]
+    PQ = [2,4]
     Sb = float(100.0) #MVA
     Vb = float(13.8) #kV
 
@@ -79,16 +79,16 @@ else:
 
     #Dados das barras PV
     if PV != None:
-        aux_p_PV = ['50','100','150'] 
-        aux_v_PV = ['1','1','1'] 
+        aux_p_PV = ['150'] 
+        aux_v_PV = ['1'] 
         for i,id in enumerate(PV):
             P[id-1] = float(aux_p_PV[i])/Sb
             V[id-1] = float(aux_v_PV[i])
 
     #Dados das barras PQ
     if PQ != None:
-        aux_p_PQ = ['50','100','150'] 
-        aux_q_PQ = ['30','45','-105']
+        aux_p_PQ = ['50','150'] 
+        aux_q_PQ = ['30','45']
         for i,id in enumerate(PQ):
             P[id-1] = float(aux_p_PQ[i])/Sb
             Q[id-1] = float(aux_q_PQ[i])/Sb
@@ -125,7 +125,27 @@ while erro > e:
     novoV = V_ite[-1].copy()
     if PV != None:
         for id in PQ:
-            novoQ[id-1] = 0
+            i = id-1
+            tempQ = 0
+            for j in range(n):
+                tempQ -= abs(Y[i,j]*novoV[i]*novoV[j])*math.sin(cmath.phase(Y[i,j])-cmath.phase(novoV[i]+cmath.phase(novoV[j])))
+            novoQ[i] = tempQ
+        for i in range(n):
+            if i != slack-1:
+                aux = (complex(P[i],-novoQ[i])/novoV[i].conjugate())
+                for j in range(n):
+                    aux -= Y[i,j]*novoV[j] if i!=j else 0
+                temp = aux/Y[i,i]
+                if (i+1) in PQ:
+                    nfase = cmath.phase(complex(math.sqrt(abs(novoV[i])*abs(novoV[i]) - temp.imag*temp.imag),temp.imag))
+                    novoV[i] = cmath.rect(abs(novoV[i]),nfase)
+                else: 
+                    novoV[i] = temp
+        aux_erro = max([abs(a - b) for a, b in zip(novoV, V_ite[-1])])
+        erro = max(aux_erro,max([abs(a - b) for a, b in zip(novoQ, Q_ite[-1])]))
+        print([f"{modulo:.4f}<{fase*180/cmath.pi:.2f}°" for modulo,fase in list(map(cmath.polar,novoV))],[f"{valor:.4f}" for valor in novoQ],"\terro: ", erro)
+        V_ite += [novoV]
+        Q_ite += [novoQ]
     else:
         for i in range(n):
             if i != slack-1:
