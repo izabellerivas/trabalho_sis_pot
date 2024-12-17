@@ -1,3 +1,5 @@
+'''Gauss-Seidel aplicado para cálculo do fluxo de potência'''
+
 from itertools import combinations
 import numpy as np
 import cmath
@@ -61,13 +63,13 @@ if not flag:
         admitancia = 0 if aux == '-' else 1/complex(aux)
         admitancias[(i+1,i+1)] = admitancia
 else:
-    e = 0.01
-    n = 4 
+    e = 0.001
+    n = 3
     slack = 1 
-    PV = [3]
-    PQ = [2,4]
-    Sb = float(100.0) #MVA
-    Vb = float(13.8) #kV
+    PV = [2]
+    PQ = [3]
+    Sb = 100.0 #MVA
+    Vb = 13.8 #kV
 
     delta = [0]*n #ângulo das tensões
     P = [0.0]*n #vetor das potências ativas
@@ -77,32 +79,39 @@ else:
     V = [complex(aux)]*n #vetor de tensão 
     V[slack-1] = 1.05 + 0j
 
+    pares_de_barras = list(combinations(range(1, n+1), 2))
     #Dados das barras PV
     if PV != None:
-        aux_p_PV = ['150'] 
-        aux_v_PV = ['1'] 
+        aux_p_PV = [50.0-305] 
+        aux_v_PV = [1.0] 
         for i,id in enumerate(PV):
-            P[id-1] = float(aux_p_PV[i])/Sb
-            V[id-1] = float(aux_v_PV[i])
+            P[id-1] = aux_p_PV[i]/Sb
+            V[id-1] = complex(aux_v_PV[i])
 
     #Dados das barras PQ
     if PQ != None:
-        aux_p_PQ = ['50','150'] 
-        aux_q_PQ = ['30','45']
+        aux_p_PQ = [-138.6]
+        aux_q_PQ = [-45.2]
         for i,id in enumerate(PQ):
-            P[id-1] = float(aux_p_PQ[i])/Sb
-            Q[id-1] = float(aux_q_PQ[i])/Sb
+            P[id-1] = aux_p_PQ[i]/Sb
+            Q[id-1] = aux_q_PQ[i]/Sb
 
-    admitancias={(1,1):1/(1.25j),
-                (1,2):0,
-                (1,3):1/(0.25j),
-                (1,4):1/(0.2j),
-                (2,2):1/(1.25j),
-                (2,3):1/(0.4j),
-                (2,4):1/(0.2j),
-                (3,3):1/(1.25j),
-                (3,4):1/(0.125j),
-                (4,4):0}
+    admitancias={(1,1):0,
+                (1,2):10-20j,
+                (1,3):10-30j,
+                (2,2):0,
+                (2,3):16-32j,
+                (3,3):0}
+    # admitancias={(1,1):1/(1.25j),
+    #             (1,2):0,
+    #             (1,3):1/(0.25j),
+    #             (1,4):1/(0.2j),
+    #             (2,2):1/(1.25j),
+    #             (2,3):1/(0.4j),
+    #             (2,4):1/(0.2j),
+    #             (3,3):1/(1.25j),
+    #             (3,4):1/(0.125j),
+    #             (4,4):0}
 
 Y = np.zeros((n,n),dtype=complex)
 for i in range(n):
@@ -124,7 +133,7 @@ while erro > e:
     novoQ = Q_ite[-1].copy()
     novoV = V_ite[-1].copy()
     if PV != None:
-        for id in PQ:
+        for id in PV:
             i = id-1
             tempQ = 0
             for j in range(n):
@@ -136,9 +145,9 @@ while erro > e:
                 for j in range(n):
                     aux -= Y[i,j]*novoV[j] if i!=j else 0
                 temp = aux/Y[i,i]
-                if (i+1) in PQ:
-                    nfase = cmath.phase(complex(math.sqrt(abs(novoV[i])*abs(novoV[i]) - temp.imag*temp.imag),temp.imag))
-                    novoV[i] = cmath.rect(abs(novoV[i]),nfase)
+                if (i+1) in PV:
+                    nfase = cmath.phase(complex(math.sqrt(abs(V[i])*abs(V[i]) - temp.imag*temp.imag),temp.imag))
+                    novoV[i] = cmath.rect(abs(V[i]),nfase)
                 else: 
                     novoV[i] = temp
         aux_erro = max([abs(a - b) for a, b in zip(novoV, V_ite[-1])])
@@ -153,24 +162,24 @@ while erro > e:
                 for j in range(n):
                     aux -= Y[i,j]*novoV[j] if i!=j else 0
                 novoV[i] = aux/Y[i,i]
-        # print([f"{abs(x):.5f}" for x in novoV])
         erro = max([abs(a - b) for a, b in zip(novoV, V_ite[-1])])
         print([f"{modulo:.4f}<{fase*180/cmath.pi:.2f}°" for modulo,fase in list(map(cmath.polar,novoV))], "\terro: ", erro)
         V_ite += [novoV]
-        # print(f"Erro: {erro}")
+
 print("\n")
 #Cálculo da potência
 P_l = np.zeros((n,n))
 Q_l = np.zeros((n,n))
-P_final = P.copy()
-Q_final = Q.copy()
+P_final = [0]*n
+Q_final = [0]*n
+print("Potência injetada na barra")
 for i in range(n):
     for j in range(n):
-        P_final[i] += abs(Y[i,j]*novoV[i]*novoV[j])*math.cos(cmath.phase(Y[i,j])-cmath.phase(novoV[i]+cmath.phase(novoV[j])))
-        Q_final[i] -= abs(Y[i,j]*novoV[i]*novoV[j])*math.sin(cmath.phase(Y[i,j])-cmath.phase(novoV[i]+cmath.phase(novoV[j])))
+        P_final[i] += abs(Y[i,j]*novoV[i]*novoV[j])*math.cos(cmath.phase(Y[i,j])-cmath.phase(novoV[i])+cmath.phase(novoV[j]))
+        Q_final[i] -= abs(Y[i,j]*novoV[i]*novoV[j])*math.sin(cmath.phase(Y[i,j])-cmath.phase(novoV[i])+cmath.phase(novoV[j]))
 
-        P_l[i,j] = 0 if i==j else abs(Y[i,j]*novoV[i]*novoV[j])*math.cos(cmath.phase(Y[i,j])-cmath.phase(novoV[i]+cmath.phase(novoV[j])))
-        Q_l[i,j] = 0 if i==j else -abs(Y[i,j]*novoV[i]*novoV[j])*math.sin(cmath.phase(Y[i,j])-cmath.phase(novoV[i]+cmath.phase(novoV[j])))
+        P_l[i,j] = 0 if i==j else -abs(Y[i,j]*novoV[i]*novoV[i])*math.cos(cmath.phase(Y[i,j]))+abs(Y[i,j]*novoV[i]*novoV[j])*math.cos(cmath.phase(Y[i,j])-cmath.phase(novoV[i])+cmath.phase(novoV[j]))
+        Q_l[i,j] = 0 if i==j else abs(Y[i,j]*novoV[i]*novoV[i])*math.sin(cmath.phase(Y[i,j]))-abs(Y[i,j]*novoV[i]*novoV[j])*math.sin(cmath.phase(Y[i,j])-cmath.phase(novoV[i])+cmath.phase(novoV[j]))
 
     print(f"Barra {i+1}: {P_final[i]:.4f} + j({Q_final[i]:.4f}) pu \t\t {P_final[i]*Sb:.4f} + j({Q_final[i]*Sb:.4f}) MVA ")
 
@@ -179,6 +188,16 @@ print(P_l)
 print("\nMatriz de potência reativa nas linhas (em pu)")
 print(Q_l)
 
-perdas_P = np.sum(P_l)
-perdas_Q = np.sum(Q_l)
-print(f"\nPerdas: {perdas_P} + j({perdas_Q}) pu \t\t {perdas_P*Sb} + j({perdas_Q*Sb}) MVA")
+print("\n")
+
+perdasP = {}
+perdasQ = {}
+for barra1, barra2 in pares_de_barras:
+    perdasP[(barra1,barra2)] = P_l[barra1-1,barra2-1]+ P_l[barra2-1,barra1-1]
+    perdasQ[(barra1,barra2)] = Q_l[barra1-1,barra2-1]+ Q_l[barra2-1,barra1-1]
+    print(f"Perdas na linha {barra1}-{barra2}: {perdasP[(barra1,barra2)]:.4f} + j({perdasQ[(barra1,barra2)]:.4f}) pu \t\t {perdasP[(barra1,barra2)]*Sb:.4f} + j({perdasQ[(barra1,barra2)]*Sb:.4f}) MVA")
+
+perdastot_P = np.sum(P_l)
+perdastot_Q = np.sum(Q_l)
+
+print(f"\nPerdas totais: {perdastot_P} + j({perdastot_Q}) pu \t\t {perdastot_P*Sb} + j({perdastot_Q*Sb}) MVA")
