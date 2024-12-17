@@ -64,6 +64,7 @@ if not flag:
         admitancias[(i+1,i+1)] = admitancia
 else:
     e = 0.001
+    max_ite = 20
     n = 3
     slack = 1 
     PV = [2]
@@ -129,7 +130,10 @@ print("\n")
 V_ite = [V]
 Q_ite = [Q]
 erro = 1
-while erro > e:
+cont = 0
+print("V | Q | erro")
+while (erro > e) | (cont > max_ite):
+    cont += 1
     novoQ = Q_ite[-1].copy()
     novoV = V_ite[-1].copy()
     if PV != None:
