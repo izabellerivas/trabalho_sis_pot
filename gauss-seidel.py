@@ -6,17 +6,15 @@ import cmath
 import math
 import dados_alimentador as dados
 
-print("Matriz de Admitância (em pu)")
-print(dados.Y)
-print("\n")
+np.set_printoptions(linewidth=200)
 
 #Método Iterativo - Gauss-Seidel
 V_ite = [dados.V]
 Q_ite = [dados.Q]
 erro = 1
 cont = 0
-print("V | Q | erro")
-while (erro > dados.e) | (cont > dados.max_ite):
+print("it: V | Q | erro")
+while (erro > dados.e) and (cont < dados.max_ite):
     cont += 1
     novoQ = Q_ite[-1].copy()
     novoV = V_ite[-1].copy()
@@ -25,7 +23,7 @@ while (erro > dados.e) | (cont > dados.max_ite):
             i = id-1
             tempQ = 0
             for j in range(dados.n):
-                tempQ -= abs(dados.Y[i,j]*novoV[i]*novoV[j])*math.sin(cmath.phase(dados.Y[i,j])-cmath.phase(novoV[i]+cmath.phase(novoV[j])))
+                tempQ -= abs(dados.Y[i,j]*novoV[i]*novoV[j])*math.sin(cmath.phase(dados.Y[i,j])-cmath.phase(novoV[i])+cmath.phase(novoV[j]))
             novoQ[i] = tempQ
         for i in range(dados.n):
             if i != dados.slack-1:
@@ -38,9 +36,9 @@ while (erro > dados.e) | (cont > dados.max_ite):
                     novoV[i] = cmath.rect(abs(dados.V[i]),nfase)
                 else: 
                     novoV[i] = temp
-        aux_erro = max([abs(a - b) for a, b in zip(novoV, V_ite[-1])])
-        erro = max(aux_erro,max([abs(a - b) for a, b in zip(novoQ, Q_ite[-1])]))
-        print([f"{modulo:.4f}<{fase*180/cmath.pi:.2f}°" for modulo,fase in list(map(cmath.polar,novoV))],[f"{valor:.4f}" for valor in novoQ],"\terro: ", erro)
+        aux_erro = max([abs(abs(a)- abs(b)) for a, b in zip(novoV, V_ite[-1])])
+        erro = max(aux_erro,max([abs(abs(a) - abs(b)) for a, b in zip(novoQ, Q_ite[-1])])) if cont !=1 else 1
+        print(f"{cont}: ",[f"{modulo:.4f}<{fase*180/cmath.pi:.2f}°" for modulo,fase in list(map(cmath.polar,novoV))],[f"{valor:.4f}" for valor in novoQ],"\terro: ", erro)
         V_ite += [novoV]
         Q_ite += [novoQ]
     else:
@@ -50,8 +48,8 @@ while (erro > dados.e) | (cont > dados.max_ite):
                 for j in range(dados.n):
                     aux -= dados.Y[i,j]*novoV[j] if i!=j else 0
                 novoV[i] = aux/dados.Y[i,i]
-        erro = max([abs(a - b) for a, b in zip(novoV, V_ite[-1])])
-        print([f"{modulo:.4f}<{fase*180/cmath.pi:.2f}°" for modulo,fase in list(map(cmath.polar,novoV))], "\terro: ", erro)
+        erro = max([abs(a)- abs(b) for a, b in zip(novoV, V_ite[-1])])
+        print(f"{cont}: ",[f"{modulo:.4f}<{fase*180/cmath.pi:.2f}°" for modulo,fase in list(map(cmath.polar,novoV))], "\terro: ", erro)
         V_ite += [novoV]
 
 print("\n")
@@ -63,9 +61,16 @@ Q_final = [0]*dados.n
 print("Potência injetada na barra")
 for i in range(dados.n):
     for j in range(dados.n):
-        P_final[i] += abs(dados.Y[i,j]*novoV[i]*novoV[j])*math.cos(cmath.phase(dados.Y[i,j])-cmath.phase(novoV[i])+cmath.phase(novoV[j]))
-        Q_final[i] -= abs(dados.Y[i,j]*novoV[i]*novoV[j])*math.sin(cmath.phase(dados.Y[i,j])-cmath.phase(novoV[i])+cmath.phase(novoV[j]))
-
+        if (i+1) in dados.PQ:
+            P_final[i] = dados.P[i]
+            Q_final[i] = dados.Q[i]
+        elif (i+1) in dados.PV:
+            P_final[i] = dados.P[i]
+            Q_final[i] = novoQ[i]
+        else:
+            P_final[i] += abs(dados.Y[i,j]*novoV[i]*novoV[j])*math.cos(cmath.phase(dados.Y[i,j])-cmath.phase(novoV[i])+cmath.phase(novoV[j]))
+            Q_final[i] -= abs(dados.Y[i,j]*novoV[i]*novoV[j])*math.sin(cmath.phase(dados.Y[i,j])-cmath.phase(novoV[i])+cmath.phase(novoV[j]))
+            
         P_l[i,j] = 0 if i==j else -abs(dados.Y[i,j]*novoV[i]*novoV[i])*math.cos(cmath.phase(dados.Y[i,j]))+abs(dados.Y[i,j]*novoV[i]*novoV[j])*math.cos(cmath.phase(dados.Y[i,j])-cmath.phase(novoV[i])+cmath.phase(novoV[j]))
         Q_l[i,j] = 0 if i==j else abs(dados.Y[i,j]*novoV[i]*novoV[i])*math.sin(cmath.phase(dados.Y[i,j]))-abs(dados.Y[i,j]*novoV[i]*novoV[j])*math.sin(cmath.phase(dados.Y[i,j])-cmath.phase(novoV[i])+cmath.phase(novoV[j]))
 
@@ -88,4 +93,9 @@ for barra1, barra2 in dados.pares_de_barras:
 perdastot_P = np.sum(P_l)
 perdastot_Q = np.sum(Q_l)
 
-print(f"\nPerdas totais: {perdastot_P} + j({perdastot_Q}) pu \t\t {perdastot_P*dados.Sb} + j({perdastot_Q*dados.Sb}) MVA")
+print(f"Número de iterações: {cont}")
+print(f"\nPerdas totais: {perdastot_P:.4f} + j({perdastot_Q:.4f}) pu \t\t {perdastot_P*dados.Sb:.4f} + j({perdastot_Q*dados.Sb:.4f}) MVA")
+
+print("V: ",[f"{modulo:.4f}<{fase*180/cmath.pi:.2f}°" for modulo,fase in list(map(cmath.polar,novoV))])
+print("S: ",[f"{p:.4f}+ j({q:.4f}) pu" for p,q in zip(P_final,Q_final)])
+print("S: ",[f"{p*dados.Sb:.4f}+ j({q*dados.Sb:.4f}) MVA" for p,q in zip(P_final,Q_final)])

@@ -64,9 +64,7 @@ def calc_dQdV(Y,V,Fase,id_i,id_j):
     else:
         return -abs(V[i]*Y[i,j])*math.sin(cmath.phase(Y[i,j])-Fase[i]+Fase[j])
 
-print("Matriz de Admitância (em pu)")
-print(dados.Y)
-print("\n")
+np.set_printoptions(linewidth=200)
 
 #NEWTON-RAPHSON
 #montando matriz jacobiana
@@ -80,27 +78,62 @@ J = np.zeros((nJ,nJ))
 R = np.zeros(nJ) #vetor de valores do delta fase e módulos da tensão
 D = np.zeros(nJ) # vetor de valor do erro de potência
 
-Pinj = [pot for i,pot in enumerate(dados.P) if i != (dados.slack-1)]
-Qinj = [potq for i,potq in enumerate(dados.Q) if (i+1) in dados.PQ]
+Pinj_PQ = [pot for i,pot in enumerate(dados.P) if (i+1) in dados.PQ]
+Pinj_PV = [pot for i,pot in enumerate(dados.P) if (i+1) in dados.PV]
+Qinj_PQ = [potq for i,potq in enumerate(dados.Q) if (i+1) in dados.PQ]
 
-inj = Pinj + Qinj
+inj = Pinj_PQ + Pinj_PV + Qinj_PQ
+V = [abs(num) for num in dados.V]
+Fase = [cmath.phase(num) for num in dados.V]
+V_ite = [V]
+Fase_ite = [Fase]
 
-V_ite = [[abs(num) for num in dados.V]]
-Fase_ite = [[cmath.phase(num) for num in dados.V]]
-Q_ite = [dados.Q]
-P_ite = [dados.P]
+P = dados.P.copy()
+Q = dados.Q.copy()
+for id in dados.PQ:
+    P[id-1] = calc_P(dados.Y,V,Fase,id)
+    Q[id-1] = calc_Q(dados.Y,V,Fase,id)
+for id in dados.PV:
+    P[id-1] = calc_P(dados.Y,V,Fase,id)
+
+Q_ite = [Q]
+P_ite = [P]
 
 erro = 1
 cont = 0
 PQPV = dados.PQ + dados.PV
 PQ_PV_PQ = dados.PQ + dados.PV + dados.PQ 
 
-while (erro > dados.e) | (cont > dados.max_ite):
-
+while (cont < dados.max_ite):
     novoV = V_ite[-1].copy()
     novaFase = Fase_ite[-1].copy()
     novoQ = Q_ite[-1].copy()
     novoP = P_ite[-1].copy()
+
+    for id in PQPV:
+        novoP[id-1] = calc_P(dados.Y,novoV,novaFase,id)
+        if id in dados.PQ:
+            novoQ[id-1] = calc_Q(dados.Y,novoV,novaFase,id)
+
+    novoPinj_PQ = [pot for i,pot in enumerate(novoP) if (i+1) in dados.PQ]
+    novoPinj_PV = [pot for i,pot in enumerate(novoP) if (i+1) in dados.PV]
+    novoQinj_PQ = [potq for i,potq in enumerate(novoQ) if (i+1) in dados.PQ]
+    novoInj = novoPinj_PQ+novoPinj_PV+novoQinj_PQ
+    # print("novoP: ",novoP)
+    # print("novoQ: ",novoQ)
+    # print("novoInj: ",novoInj)
+    # print("inj certo: ",inj)
+    D = np.array([base - novo for base,novo in zip(inj,novoInj)]) 
+
+    erro = max(np.vectorize(abs)(D)) #precisa aplicar o abs em cada termo antes
+    if (erro<dados.e):
+        V_ite += [novoV]
+        P_ite += [novoP]
+        Q_ite += [novoQ]
+        Fase_ite += [novaFase] 
+        break
+    cont += 1
+    print(f"\nIteração {cont}")
 
     if dados.rcalcJ or (cont == 0):
         for i in range(nJ):
@@ -117,42 +150,39 @@ while (erro > dados.e) | (cont > dados.max_ite):
                 elif (i >= nPQ + nPV) and (j >= nPQ + nPV):
                     J[i,j] = calc_dQdV(dados.Y,novoV,novaFase,id_i,id_j)
 
-        print("Jacobiano:")
-        print(J)
+        # print("Jacobiano:")
+        # print(J)
         invJ = np.linalg.inv(J)
-        print("Jacobiano^-1:")
-        print(invJ)
+        # print("Jacobiano^-1:")
+        # print(invJ)
 
     #cálculo do erro da potencia
     # R = [J]^-1*D
-
-    novoPinj = [pot for i,pot in enumerate(novoP) if i != (dados.slack-1)]
-    novoQinj = [potq for i,potq in enumerate(novoQ) if (i+1) in dados.PQ]
-    novoD = novoPinj+novoQinj
-    print("novoP: ",novoP)
-    print("novoQ: ",novoQ)
-    print("novoD: ",novoD)
-    D = np.array([base - novo for base,novo in zip(inj,novoD)]) if cont != 0 else np.array(novoD)
+    
     print("D:",D)
     R = invJ @ D
-
+    print("R: ",R)
+    auxPQ = 0
     for i,id in enumerate(PQPV):
         novaFase[id-1] += R[i]
         novoP[id-1] = calc_P(dados.Y,novoV,novaFase,id)
         if id in dados.PQ:
-            novoV[id-1] += R[nPQ+nPV+i]
+            novoV[id-1] += R[nPQ+nPV+auxPQ]
             novoQ[id-1] = calc_Q(dados.Y,novoV,novaFase,id)
+            auxPQ += 1
             
+    # print("NovoV: ",novoV)
+    # print("NovaFase: ",novaFase)
+    # print("novoP: ",novoP)
+    # print("novoQ: ",novoQ)
 
     erro = max(np.vectorize(abs)(D)) #precisa aplicar o abs em cada termo antes
     V_ite += [novoV]
-    Q_ite += [novoQ]
     P_ite += [novoP]
     Q_ite += [novoQ]
     Fase_ite += [novaFase]
-    cont += 1
     
-    print([f"{modulo:.4f}<{fase*180/cmath.pi:.2f}°" for modulo,fase in zip(novoV,novaFase)],[f"{valor:.4f}" for valor in novoQ],"\terro: ", erro)
+    print([f"{modulo:.4f}<{fase*180/cmath.pi:.2f}°" for modulo,fase in zip(novoV,novaFase)],"\terro: ", erro)
 
 print("\nResultados de tensão por iteração")
 for i,lista in enumerate(V_ite):
@@ -160,7 +190,7 @@ for i,lista in enumerate(V_ite):
 
 print("\nResultados de potência por iteração")
 for i,lista in enumerate(P_ite):
-    print([f"{p:.4f}+ j({q:.4f}) pu" for p,q in zip(lista,Q_ite[i])])
+    print(f"{i}: ",[f"{p:.4f}+ j({q:.4f}) pu" for p,q in zip(lista,Q_ite[i])])
 
 #Valores finais
 #barra slack
@@ -204,9 +234,7 @@ print(f"\nPerdas totais: {perdastot_P:.4f} + j({perdastot_Q:.4f}) pu \t\t {perda
 
 
 #printando os resultados
-
-
+print(f"Número de iterações: {cont}")
 print("V: ",[f"{modulo:.4f}<{fase*180/cmath.pi:.2f}°" for modulo,fase in zip(novoV,novaFase)])
 print("S: ",[f"{p:.4f}+ j({q:.4f}) pu" for p,q in zip(novoP,novoQ)])
 print("S: ",[f"{p*dados.Sb:.4f}+ j({q*dados.Sb:.4f}) MVA" for p,q in zip(novoP,novoQ)])
-AQUI = 1

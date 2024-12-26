@@ -2,8 +2,8 @@ from itertools import combinations
 import numpy as np
 
 rcalcJ = True
-e = 0.001
-max_ite = 20
+e = 0.00001
+max_ite =30
 n = 5
 slack = 1 
 PV = [4]
@@ -21,7 +21,7 @@ V[slack-1] = 1.02 + 0j
 pares_de_barras = list(combinations(range(1, n+1), 2))
 #Dados das barras PV
 if PV != None:
-    aux_p_PV = [80-25] 
+    aux_p_PV = [(80.0-25.0)] 
     aux_v_PV = [1.0] 
     for i,id in enumerate(PV):
         P[id-1] = aux_p_PV[i]/Sb
@@ -60,6 +60,8 @@ for i in range(n):
         except:
             Y[i,i] += admitancias[(j+1,i+1)]
             Y[i,j] = - admitancias[(j+1,i+1)]
+
+np.set_printoptions(linewidth=200)
 print("Matriz de Admitância (em pu)")
 print(Y)
 print("\n")
