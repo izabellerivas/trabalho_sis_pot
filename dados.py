@@ -9,7 +9,7 @@ slack = 1
 PV = [4]
 PQ = [2,3,5]
 Sb = 100.0 #MVA
-Vb = 13.8 #kV
+Vb = 13.8 #kV0
 
 P = [0.0]*n #vetor das potências ativas
 Q = [0.0]*n #vetor das potências reativas

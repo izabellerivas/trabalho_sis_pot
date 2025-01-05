@@ -4,7 +4,7 @@ from itertools import combinations
 import numpy as np
 import cmath
 import math
-import dados_alimentador as dados
+import dados as dados
 
 np.set_printoptions(linewidth=200)
 

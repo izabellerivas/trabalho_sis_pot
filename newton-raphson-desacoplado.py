@@ -2,7 +2,7 @@ from itertools import combinations
 import numpy as np
 import math
 import cmath
-import dados_alimentador as dados
+import dados as dados
 
 #Calcula a potência ativa na barra id (lembrando que o id começa no 1)
 def calc_P(Y,V,Fase,id):
