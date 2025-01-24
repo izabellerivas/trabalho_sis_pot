@@ -11,7 +11,6 @@ Este repositório implementa um código para o cálculo do fluxo de potência em
 - `gauss-seidel.py`: Implementação do método de Gauss-Seidel para resolver o fluxo de potência.
 - `newton-raphson-desacoplado.py`: Implementação do método de Newton-Raphson desacoplado.
 - `newton-raphson.py`: Implementação do método de Newton-Raphson para resolver o fluxo de potência.
-- `trabalho_sis_pot.zip`: Arquivo compactado do projeto
 
 ## Requisitos
 
