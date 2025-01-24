@@ -159,9 +159,9 @@ while (cont < dados.max_ite):
     #cálculo do erro da potencia
     # R = [J]^-1*D
     
-    print("D:",D)
+    # print("D:",D)
     R = invJ @ D
-    print("R: ",R)
+    # print("R: ",R)
     auxPQ = 0
     for i,id in enumerate(PQPV):
         novaFase[id-1] += R[i]
@@ -234,7 +234,7 @@ print(f"\nPerdas totais: {perdastot_P:.4f} + j({perdastot_Q:.4f}) pu \t\t {perda
 
 
 #printando os resultados
-print(f"Número de iterações: {cont}")
+print(f"Número de iterações: {cont+1}")
 print("V: ",[f"{modulo:.4f}<{fase*180/cmath.pi:.2f}°" for modulo,fase in zip(novoV,novaFase)])
 print("S: ",[f"{p:.4f}+ j({q:.4f}) pu" for p,q in zip(novoP,novoQ)])
 print("S: ",[f"{p*dados.Sb:.4f}+ j({q*dados.Sb:.4f}) MVA" for p,q in zip(novoP,novoQ)])
